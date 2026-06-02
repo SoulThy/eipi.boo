@@ -1,0 +1,18 @@
+[package]
+name = "eipi"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+russh = "0.48"
+russh-keys = "0.48"
+ratatui = "0.29"
+crossterm = "0.28"
+rusqlite = { version = "0.32", features = ["bundled"] }
+tokio = { version = "1", features = ["full"] }
+rand = "0.8"
+anyhow = "1"
+async-trait = "0.1"
+ssh-key = { version = "0.6", features = ["std"] }
+log = "0.4"
+env_logger = "0.11"
