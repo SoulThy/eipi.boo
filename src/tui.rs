@@ -132,7 +132,7 @@ pub fn render(frame: &mut Frame, state: &RenderState) {
                 msg.to_string()
             } else {
                 format!(
-                    " {} confessions by {} humans | [hjkl/←↑↓→] Scroll  [Tab] Select  [Enter] Upvote  [n] New  [q] Quit",
+                    " {} confessions by {} humans | [hjkl/←↑↓→] Scroll  [Tab] Select  [Enter] Upvote  [n] New  [?] Bugs  [q] Quit",
                     state.total_confessions, state.total_humans
                 )
             }

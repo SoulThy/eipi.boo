@@ -184,6 +184,12 @@ impl ClientHandler {
                     self.mode = InputMode::Compose;
                     self.compose_buf.clear();
                 }
+                (InputMode::Browse, KeyEvent::Char('?')) => {
+                    self.message = Some(
+                        "bugs/features → https://github.com/pwnwriter/eipi.boo/issues/new"
+                            .to_string(),
+                    );
+                }
                 (InputMode::Compose, KeyEvent::Escape) => {
                     self.mode = InputMode::Browse;
                     self.compose_buf.clear();
