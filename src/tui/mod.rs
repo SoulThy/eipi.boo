@@ -75,6 +75,7 @@ pub struct RenderState<'a> {
     pub viewing_confession: Option<&'a Confession>,
     pub reply_scroll: usize,
     pub card_index: usize,
+    pub came_from_card: bool,
 }
 
 pub fn render(frame: &mut Frame, state: &RenderState) {
@@ -89,9 +90,30 @@ pub fn render(frame: &mut Frame, state: &RenderState) {
     let main_area = chunks[0];
     let status_area = chunks[1];
 
+    let card_reply = state.came_from_card
+        && matches!(state.mode, InputMode::ViewReplies | InputMode::ComposeReply);
+
     if state.mode == InputMode::CardView {
         card_view::render(frame, state, main_area);
         statusline::render(frame, state, status_area);
+
+        if state.mode == InputMode::Compose {
+            compose::render_confession(frame, state.compose_buf, area);
+        }
+        return;
+    }
+
+    if card_reply {
+        let half = main_area.width / 2;
+        let h_chunks =
+            Layout::horizontal([Constraint::Length(half), Constraint::Min(0)]).split(main_area);
+        card_view::render(frame, state, h_chunks[0]);
+        reply_panel::render(frame, state, h_chunks[1]);
+        statusline::render(frame, state, status_area);
+
+        if state.mode == InputMode::ComposeReply && !state.reply_name_phase {
+            compose::render_reply(frame, state.compose_buf, state.reply_name_buf, area);
+        }
         return;
     }
 

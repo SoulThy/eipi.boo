@@ -36,6 +36,7 @@ pub(crate) struct ClientHandler {
     viewing_confession: Option<usize>,
     reply_scroll: usize,
     card_index: usize,
+    came_from_card: bool,
     message: Option<String>,
     terminal: Option<Terminal<CrosstermBackend<TermWriter>>>,
     writer: TermWriter,
@@ -61,6 +62,7 @@ impl ClientHandler {
             viewing_confession: None,
             reply_scroll: 0,
             card_index: 0,
+            came_from_card: false,
             message: None,
             terminal: None,
             writer: TermWriter::default(),
@@ -207,7 +209,14 @@ impl ClientHandler {
         self.reply_name_buf.clear();
         self.reload_replies();
         self.reload_confessions();
-        self.mode = InputMode::ViewReplies;
+        if self.came_from_card {
+            self.mode = InputMode::CardView;
+            self.came_from_card = false;
+            self.viewing_confession = None;
+            self.replies.clear();
+        } else {
+            self.mode = InputMode::ViewReplies;
+        }
     }
 
     fn submit_confession(&mut self) {
@@ -276,7 +285,10 @@ impl ClientHandler {
                 (InputMode::Browse, KeyEvent::Left | KeyEvent::Char('h')) => self.cam_x -= 5,
                 (InputMode::Browse, KeyEvent::Right | KeyEvent::Char('l')) => self.cam_x += 5,
                 (InputMode::Browse, KeyEvent::Tab) => self.cycle_selection(),
-                (InputMode::Browse, KeyEvent::Enter) => self.open_replies(),
+                (InputMode::Browse, KeyEvent::Enter) => {
+                    self.came_from_card = false;
+                    self.open_replies();
+                }
                 (InputMode::Browse, KeyEvent::Char('v')) => self.upvote_selected(),
                 (InputMode::Browse, KeyEvent::Char('n')) => {
                     self.mode = InputMode::Compose;
@@ -314,9 +326,11 @@ impl ClientHandler {
                 }
                 (InputMode::CardView, KeyEvent::Enter) => {
                     self.selected = Some(self.card_index);
+                    self.came_from_card = true;
                     self.open_replies();
                 }
                 (InputMode::CardView, KeyEvent::Char('n')) => {
+                    self.came_from_card = true;
                     self.mode = InputMode::Compose;
                     self.compose_buf.clear();
                 }
@@ -340,7 +354,12 @@ impl ClientHandler {
                 }
 
                 (InputMode::ViewReplies, KeyEvent::Escape | KeyEvent::Char('q')) => {
-                    self.mode = InputMode::Browse;
+                    if self.came_from_card {
+                        self.mode = InputMode::CardView;
+                        self.came_from_card = false;
+                    } else {
+                        self.mode = InputMode::Browse;
+                    }
                     self.viewing_confession = None;
                     self.replies.clear();
                 }
@@ -390,12 +409,20 @@ impl ClientHandler {
                 }
 
                 (InputMode::Compose, KeyEvent::Escape) => {
-                    self.mode = InputMode::Browse;
+                    self.mode = if self.came_from_card {
+                        InputMode::CardView
+                    } else {
+                        InputMode::Browse
+                    };
                     self.compose_buf.clear();
                 }
                 (InputMode::Compose, KeyEvent::Enter) => {
                     self.submit_confession();
-                    self.mode = InputMode::Browse;
+                    self.mode = if self.came_from_card {
+                        InputMode::CardView
+                    } else {
+                        InputMode::Browse
+                    };
                 }
                 (InputMode::Compose, KeyEvent::Char(c))
                     if self.compose_buf.len() < confession::MAX_LENGTH =>
@@ -446,6 +473,7 @@ impl ClientHandler {
             viewing_confession: viewing,
             reply_scroll: self.reply_scroll,
             card_index: self.card_index,
+            came_from_card: self.came_from_card,
         };
 
         match terminal.draw(|frame| {
