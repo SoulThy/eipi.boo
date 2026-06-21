@@ -153,11 +153,11 @@ impl ClientHandler {
     }
 
     fn reload_replies(&mut self) {
-        if let Some(idx) = self.viewing_confession {
-            if let Some(confession) = self.confessions.get(idx) {
-                let db = self.shared.db.lock().unwrap();
-                self.replies = db::get_replies(&db, confession.id);
-            }
+        if let Some(idx) = self.viewing_confession
+            && let Some(confession) = self.confessions.get(idx)
+        {
+            let db = self.shared.db.lock().unwrap();
+            self.replies = db::get_replies(&db, confession.id);
         }
     }
 
@@ -296,10 +296,10 @@ impl ClientHandler {
                 (InputMode::ViewReplies, KeyEvent::Up | KeyEvent::Char('k')) => {
                     self.reply_scroll = self.reply_scroll.saturating_sub(1);
                 }
-                (InputMode::ViewReplies, KeyEvent::Down | KeyEvent::Char('j')) => {
-                    if self.reply_scroll + 1 < self.replies.len() {
-                        self.reply_scroll += 1;
-                    }
+                (InputMode::ViewReplies, KeyEvent::Down | KeyEvent::Char('j'))
+                    if self.reply_scroll + 1 < self.replies.len() =>
+                {
+                    self.reply_scroll += 1;
                 }
                 (InputMode::ViewReplies, KeyEvent::Char('v')) => self.upvote_selected(),
                 (InputMode::ViewReplies, KeyEvent::Char('r')) => {
@@ -346,10 +346,10 @@ impl ClientHandler {
                     self.submit_confession();
                     self.mode = InputMode::Browse;
                 }
-                (InputMode::Compose, KeyEvent::Char(c)) => {
-                    if self.compose_buf.len() < confession::MAX_LENGTH {
-                        self.compose_buf.push(*c);
-                    }
+                (InputMode::Compose, KeyEvent::Char(c))
+                    if self.compose_buf.len() < confession::MAX_LENGTH =>
+                {
+                    self.compose_buf.push(*c);
                 }
                 (InputMode::Compose, KeyEvent::Backspace) => {
                     self.compose_buf.pop();

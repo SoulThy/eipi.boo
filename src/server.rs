@@ -65,6 +65,8 @@ pub async fn run() -> Result<()> {
         ..Default::default()
     });
 
+    crate::web::write_index();
+
     info!("Starting eipi.boo SSH server on {}", listen_addr);
     info!(
         "Connect with: ssh -p {} localhost",

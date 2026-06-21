@@ -91,7 +91,7 @@ pub fn parse(data: &[u8]) -> Vec<KeyEvent> {
                 events.push(KeyEvent::Char('q'));
                 i += 1;
             }
-            b if b >= 0x20 && b < 0x7f => {
+            b if (0x20..0x7f).contains(&b) => {
                 events.push(KeyEvent::Char(b as char));
                 i += 1;
             }

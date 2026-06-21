@@ -1,4 +1,8 @@
-<!DOCTYPE html>
+use std::path::Path;
+
+use log::info;
+
+const PAGE: &str = r#"<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -71,4 +75,18 @@
     </p>
   </div>
 </body>
-</html>
+</html>"#;
+
+pub fn write_index() {
+    let web_dir = std::env::var("EIPI_WEB_DIR").unwrap_or_else(|_| "web".to_string());
+    let path = Path::new(&web_dir).join("index.html");
+
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+
+    match std::fs::write(&path, PAGE) {
+        Ok(_) => info!("Web page written to {}", path.display()),
+        Err(e) => info!("Failed to write web page: {}", e),
+    }
+}

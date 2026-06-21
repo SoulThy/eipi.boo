@@ -7,6 +7,7 @@ mod input;
 mod reply;
 mod server;
 mod tui;
+mod web;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
