@@ -124,3 +124,13 @@ pub fn stats(conn: &Connection) -> (i64, i64) {
         .unwrap_or(0);
     (confessions, humans)
 }
+
+pub fn voted_confession_ids(conn: &Connection, fingerprint: &str) -> Vec<i64> {
+    let mut stmt = conn
+        .prepare("SELECT confession_id FROM votes WHERE voter_fingerprint = ?1")
+        .unwrap();
+    stmt.query_map(params![fingerprint], |row| row.get(0))
+        .unwrap()
+        .filter_map(|r| r.ok())
+        .collect()
+}

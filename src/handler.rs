@@ -231,14 +231,17 @@ impl ClientHandler {
     }
 
     fn do_render(&mut self) -> Vec<u8> {
+        let fp = self.fingerprint_str();
+
         let Some(terminal) = self.terminal.as_mut() else {
             debug!("do_render: no terminal initialized");
             return Vec::new();
         };
-
-        let (total_confessions, total_humans) = {
+        let (total_confessions, total_humans, voted_ids) = {
             let db = self.shared.db.lock().unwrap();
-            db::stats(&db)
+            let stats = db::stats(&db);
+            let voted = db::voted_confession_ids(&db, &fp);
+            (stats.0, stats.1, voted)
         };
 
         let state = RenderState {
@@ -251,6 +254,7 @@ impl ClientHandler {
             message: self.message.as_deref(),
             total_confessions,
             total_humans,
+            voted_ids: &voted_ids,
         };
 
         match terminal.draw(|frame| {

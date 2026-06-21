@@ -30,6 +30,10 @@ fn parse_sgr_mouse(data: &[u8]) -> Option<(KeyEvent, usize)> {
 
     if is_press && button == 0 {
         Some((KeyEvent::MouseClick(col.saturating_sub(1), row.saturating_sub(1)), end + 1))
+    } else if button == 64 {
+        Some((KeyEvent::Up, end + 1))
+    } else if button == 65 {
+        Some((KeyEvent::Down, end + 1))
     } else {
         Some((KeyEvent::Char('\0'), end + 1))
     }

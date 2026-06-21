@@ -62,6 +62,7 @@ pub struct RenderState<'a> {
     pub message: Option<&'a str>,
     pub total_confessions: i64,
     pub total_humans: i64,
+    pub voted_ids: &'a [i64],
 }
 
 pub fn render(frame: &mut Frame, state: &RenderState) {
@@ -111,7 +112,8 @@ pub fn render(frame: &mut Frame, state: &RenderState) {
         let rect = Rect::new(canvas_area.x + sx, canvas_area.y + sy, avail_w, avail_h);
 
         let is_selected = state.selected == Some(idx);
-        render_confession_box(frame, c, rect, is_selected);
+        let has_voted = state.voted_ids.contains(&c.id);
+        render_confession_box(frame, c, rect, is_selected, has_voted);
     }
 
     if state.confessions.is_empty() {
@@ -154,7 +156,13 @@ pub fn render(frame: &mut Frame, state: &RenderState) {
     }
 }
 
-fn render_confession_box(frame: &mut Frame, c: &Confession, area: Rect, selected: bool) {
+fn render_confession_box(
+    frame: &mut Frame,
+    c: &Confession,
+    area: Rect,
+    selected: bool,
+    has_voted: bool,
+) {
     let border_style = if selected {
         Style::default()
             .fg(Color::Yellow)
@@ -169,11 +177,18 @@ fn render_confession_box(frame: &mut Frame, c: &Confession, area: Rect, selected
         Style::default().fg(Color::DarkGray)
     };
 
-    let vote_display = format!("♥ {}", c.votes);
+    let heart = if has_voted { "󰋑" } else { "♥" };
+    let vote_display = format!("{} {}", heart, c.votes);
 
-    let block = Block::bordered().border_style(border_style).title_bottom(
+    let mut block = Block::bordered().border_style(border_style).title_bottom(
         Line::from(Span::styled(vote_display, Style::default().fg(Color::Red))).right_aligned(),
     );
+
+    if selected {
+        block = block.title(
+            Line::from(Span::styled(" ▶ ", Style::default().fg(Color::Yellow))),
+        );
+    }
 
     let text_style = if c.votes > 50 {
         Style::default()
