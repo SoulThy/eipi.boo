@@ -51,7 +51,7 @@ pub async fn run() -> Result<()> {
     let db_path = std::env::var("EIPI_DB_PATH").unwrap_or_else(|_| "eipi.db".to_string());
     let host_key_path =
         std::env::var("EIPI_HOST_KEY").unwrap_or_else(|_| "assets/host_key".to_string());
-    let listen_addr = std::env::var("EIPI_LISTEN").unwrap_or_else(|_| "0.0.0.0:2222".to_string());
+    let listen_addr = std::env::var("EIPI_LISTEN").unwrap_or_else(|_| "0.0.0.0:22".to_string());
 
     let conn = db::init(&db_path)?;
     let state = Arc::new(AppState {
@@ -66,7 +66,7 @@ pub async fn run() -> Result<()> {
     });
 
     info!("Starting eipi.boo SSH server on {}", listen_addr);
-    info!("Connect with: ssh -p 2222 localhost");
+    info!("Connect with: ssh -p {} localhost", listen_addr.rsplit(':').next().unwrap_or("22"));
 
     let mut server = SshServer { state };
     server.run_on_address(config, &listen_addr).await?;

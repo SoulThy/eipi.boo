@@ -23,6 +23,8 @@
             # flyctl
           ];
 
+          EIPI_LISTEN = "0.0.0.0:2222";
+
           shellHook = ''
             echo "------eipi.boo--------"
           '';
