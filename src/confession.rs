@@ -5,10 +5,7 @@ pub struct Confession {
     pub x: i64,
     pub y: i64,
     pub votes: i64,
-    #[allow(dead_code)]
-    pub author_fingerprint: String,
-    #[allow(dead_code)]
-    pub created_at: String,
+    pub reply_count: i64,
 }
 
 pub const MAX_LENGTH: usize = 280;

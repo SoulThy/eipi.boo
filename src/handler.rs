@@ -14,6 +14,7 @@ use crate::canvas;
 use crate::confession::{self, Confession};
 use crate::db;
 use crate::input::{InputMode, KeyEvent};
+use crate::reply::{self, Reply};
 use crate::server::AppState;
 use crate::tui::{RenderState, TermWriter};
 
@@ -26,9 +27,14 @@ pub(crate) struct ClientHandler {
     selected: Option<usize>,
     mode: InputMode,
     compose_buf: String,
+    reply_name_buf: String,
+    reply_name_phase: bool,
     width: u16,
     height: u16,
     confessions: Vec<Confession>,
+    replies: Vec<Reply>,
+    viewing_confession: Option<usize>,
+    reply_scroll: usize,
     message: Option<String>,
     terminal: Option<Terminal<CrosstermBackend<TermWriter>>>,
     writer: TermWriter,
@@ -45,9 +51,14 @@ impl ClientHandler {
             selected: None,
             mode: InputMode::Browse,
             compose_buf: String::new(),
+            reply_name_buf: String::new(),
+            reply_name_phase: false,
             width: 80,
             height: 24,
             confessions: Vec::new(),
+            replies: Vec::new(),
+            viewing_confession: None,
+            reply_scroll: 0,
             message: None,
             terminal: None,
             writer: TermWriter::default(),
@@ -129,6 +140,74 @@ impl ClientHandler {
         self.reload_confessions();
     }
 
+    fn open_replies(&mut self) {
+        let Some(idx) = self.selected else { return };
+        let Some(confession) = self.confessions.get(idx) else {
+            return;
+        };
+        let db = self.shared.db.lock().unwrap();
+        self.replies = db::get_replies(&db, confession.id);
+        self.viewing_confession = Some(idx);
+        self.reply_scroll = 0;
+        self.mode = InputMode::ViewReplies;
+    }
+
+    fn reload_replies(&mut self) {
+        if let Some(idx) = self.viewing_confession {
+            if let Some(confession) = self.confessions.get(idx) {
+                let db = self.shared.db.lock().unwrap();
+                self.replies = db::get_replies(&db, confession.id);
+            }
+        }
+    }
+
+    fn submit_reply(&mut self) {
+        let text = self.compose_buf.trim().to_string();
+        if text.is_empty() {
+            self.message = Some("Empty reply".to_string());
+            return;
+        }
+        if text.len() > reply::MAX_LENGTH {
+            self.message = Some("Too long (max 100 chars)".to_string());
+            return;
+        }
+        if !confession::is_allowed(&text) {
+            self.message = Some("Reply contains blocked words".to_string());
+            return;
+        }
+
+        let Some(idx) = self.viewing_confession else {
+            return;
+        };
+        let Some(confession) = self.confessions.get(idx) else {
+            return;
+        };
+
+        let fp = self.fingerprint_str();
+        let name = if self.reply_name_buf.trim().is_empty() {
+            None
+        } else {
+            Some(self.reply_name_buf.trim().to_string())
+        };
+
+        let db = self.shared.db.lock().unwrap();
+        match db::insert_reply(&db, confession.id, &text, name.as_deref(), &fp) {
+            Ok(_) => {
+                self.message = Some("Reply posted!".to_string());
+            }
+            Err(e) => {
+                self.message = Some(format!("Error: {}", e));
+            }
+        }
+        drop(db);
+
+        self.compose_buf.clear();
+        self.reply_name_buf.clear();
+        self.reload_replies();
+        self.reload_confessions();
+        self.mode = InputMode::ViewReplies;
+    }
+
     fn submit_confession(&mut self) {
         let text = self.compose_buf.trim().to_string();
         if text.is_empty() {
@@ -180,7 +259,7 @@ impl ClientHandler {
     fn process_input(&mut self, events: Vec<KeyEvent>) -> bool {
         for event in events {
             if self.message.is_some()
-                && self.mode == InputMode::Browse
+                && (self.mode == InputMode::Browse || self.mode == InputMode::ViewReplies)
                 && event != KeyEvent::Char('q')
             {
                 self.message = None;
@@ -193,7 +272,8 @@ impl ClientHandler {
                 (InputMode::Browse, KeyEvent::Left | KeyEvent::Char('h')) => self.cam_x -= 5,
                 (InputMode::Browse, KeyEvent::Right | KeyEvent::Char('l')) => self.cam_x += 5,
                 (InputMode::Browse, KeyEvent::Tab) => self.cycle_selection(),
-                (InputMode::Browse, KeyEvent::Enter) => self.upvote_selected(),
+                (InputMode::Browse, KeyEvent::Enter) => self.open_replies(),
+                (InputMode::Browse, KeyEvent::Char('v')) => self.upvote_selected(),
                 (InputMode::Browse, KeyEvent::Char('n')) => {
                     self.mode = InputMode::Compose;
                     self.compose_buf.clear();
@@ -207,6 +287,57 @@ impl ClientHandler {
                             .to_string(),
                     );
                 }
+
+                (InputMode::ViewReplies, KeyEvent::Escape | KeyEvent::Char('q')) => {
+                    self.mode = InputMode::Browse;
+                    self.viewing_confession = None;
+                    self.replies.clear();
+                }
+                (InputMode::ViewReplies, KeyEvent::Up | KeyEvent::Char('k')) => {
+                    self.reply_scroll = self.reply_scroll.saturating_sub(1);
+                }
+                (InputMode::ViewReplies, KeyEvent::Down | KeyEvent::Char('j')) => {
+                    if self.reply_scroll + 1 < self.replies.len() {
+                        self.reply_scroll += 1;
+                    }
+                }
+                (InputMode::ViewReplies, KeyEvent::Char('v')) => self.upvote_selected(),
+                (InputMode::ViewReplies, KeyEvent::Char('r')) => {
+                    self.mode = InputMode::ComposeReply;
+                    self.compose_buf.clear();
+                    self.reply_name_buf.clear();
+                    self.reply_name_phase = true;
+                }
+
+                (InputMode::ComposeReply, KeyEvent::Escape) => {
+                    self.mode = InputMode::ViewReplies;
+                    self.compose_buf.clear();
+                    self.reply_name_buf.clear();
+                }
+                (InputMode::ComposeReply, KeyEvent::Enter) => {
+                    if self.reply_name_phase {
+                        self.reply_name_phase = false;
+                    } else {
+                        self.submit_reply();
+                    }
+                }
+                (InputMode::ComposeReply, KeyEvent::Char(c)) => {
+                    if self.reply_name_phase {
+                        if self.reply_name_buf.len() < 20 {
+                            self.reply_name_buf.push(*c);
+                        }
+                    } else if self.compose_buf.len() < reply::MAX_LENGTH {
+                        self.compose_buf.push(*c);
+                    }
+                }
+                (InputMode::ComposeReply, KeyEvent::Backspace) => {
+                    if self.reply_name_phase {
+                        self.reply_name_buf.pop();
+                    } else {
+                        self.compose_buf.pop();
+                    }
+                }
+
                 (InputMode::Compose, KeyEvent::Escape) => {
                     self.mode = InputMode::Browse;
                     self.compose_buf.clear();
@@ -243,6 +374,10 @@ impl ClientHandler {
             (stats.0, stats.1, voted)
         };
 
+        let viewing = self
+            .viewing_confession
+            .and_then(|i| self.confessions.get(i));
+
         let state = RenderState {
             confessions: &self.confessions,
             cam_x: self.cam_x,
@@ -250,10 +385,15 @@ impl ClientHandler {
             selected: self.selected,
             mode: self.mode,
             compose_buf: &self.compose_buf,
+            reply_name_buf: &self.reply_name_buf,
+            reply_name_phase: self.reply_name_phase,
             message: self.message.as_deref(),
             total_confessions,
             total_humans,
             voted_ids: &voted_ids,
+            replies: &self.replies,
+            viewing_confession: viewing,
+            reply_scroll: self.reply_scroll,
         };
 
         match terminal.draw(|frame| {

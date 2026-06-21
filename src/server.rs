@@ -66,7 +66,10 @@ pub async fn run() -> Result<()> {
     });
 
     info!("Starting eipi.boo SSH server on {}", listen_addr);
-    info!("Connect with: ssh -p {} localhost", listen_addr.rsplit(':').next().unwrap_or("22"));
+    info!(
+        "Connect with: ssh -p {} localhost",
+        listen_addr.rsplit(':').next().unwrap_or("22")
+    );
 
     let mut server = SshServer { state };
     server.run_on_address(config, &listen_addr).await?;

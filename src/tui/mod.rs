@@ -1,16 +1,20 @@
+mod compose;
+mod confession_box;
+mod reply_panel;
+
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Layout, Rect};
-use ratatui::style::{Color, Modifier, Style};
-use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
+use ratatui::style::{Color, Style};
+use ratatui::widgets::Paragraph;
 use ratatui::{Frame, Terminal, TerminalOptions, Viewport};
 
 use crate::canvas;
 use crate::confession::{self, BOX_WIDTH, Confession};
 use crate::input::InputMode;
+use crate::reply::Reply;
 
 #[derive(Clone, Default)]
 pub struct TermWriter {
@@ -59,10 +63,15 @@ pub struct RenderState<'a> {
     pub selected: Option<usize>,
     pub mode: InputMode,
     pub compose_buf: &'a str,
+    pub reply_name_buf: &'a str,
+    pub reply_name_phase: bool,
     pub message: Option<&'a str>,
     pub total_confessions: i64,
     pub total_humans: i64,
     pub voted_ids: &'a [i64],
+    pub replies: &'a [Reply],
+    pub viewing_confession: Option<&'a Confession>,
+    pub reply_scroll: usize,
 }
 
 pub fn render(frame: &mut Frame, state: &RenderState) {
@@ -73,9 +82,20 @@ pub fn render(frame: &mut Frame, state: &RenderState) {
         return;
     }
 
+    let reply_open = matches!(state.mode, InputMode::ViewReplies | InputMode::ComposeReply);
+
     let chunks = Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).split(area);
-    let canvas_area = chunks[0];
+    let main_area = chunks[0];
     let status_area = chunks[1];
+
+    let (canvas_area, reply_area) = if reply_open {
+        let half = main_area.width / 2;
+        let h_chunks =
+            Layout::horizontal([Constraint::Length(half), Constraint::Min(0)]).split(main_area);
+        (h_chunks[0], Some(h_chunks[1]))
+    } else {
+        (main_area, None)
+    };
 
     let visible = canvas::visible_confessions(
         state.confessions,
@@ -113,19 +133,20 @@ pub fn render(frame: &mut Frame, state: &RenderState) {
 
         let is_selected = state.selected == Some(idx);
         let has_voted = state.voted_ids.contains(&c.id);
-        render_confession_box(frame, c, rect, is_selected, has_voted);
+        confession_box::render(frame, c, rect, is_selected, has_voted);
     }
 
     if state.confessions.is_empty() {
         let hint = Paragraph::new("No confessions yet. Press [n] to write the first one.")
             .style(Style::default().fg(Color::DarkGray));
-        let hint_area = Rect::new(
-            canvas_area.x + canvas_area.width / 2 - 25,
-            canvas_area.y + canvas_area.height / 2,
-            50,
-            1,
-        );
-        frame.render_widget(hint, hint_area);
+        let cx = canvas_area.x + canvas_area.width.saturating_sub(50) / 2;
+        let cy = canvas_area.y + canvas_area.height / 2;
+        let hw = 50.min(canvas_area.width);
+        frame.render_widget(hint, Rect::new(cx, cy, hw, 1));
+    }
+
+    if let Some(rarea) = reply_area {
+        reply_panel::render(frame, state, rarea);
     }
 
     let status_text = match state.mode {
@@ -134,7 +155,7 @@ pub fn render(frame: &mut Frame, state: &RenderState) {
                 msg.to_string()
             } else {
                 format!(
-                    " {} confessions by {} humans | [hjkl/←↑↓→] Scroll  [Tab] Select  [Enter] Upvote  [n] New  [?] Bugs  [q] Quit",
+                    " {} confessions by {} humans | [hjkl/←↑↓→] Scroll  [Tab] Select  [v] Vote  [Enter] Replies  [n] New  [q] Quit",
                     state.total_confessions, state.total_humans
                 )
             }
@@ -146,102 +167,40 @@ pub fn render(frame: &mut Frame, state: &RenderState) {
                 confession::MAX_LENGTH,
             )
         }
+        InputMode::ViewReplies => {
+            if let Some(msg) = state.message {
+                msg.to_string()
+            } else {
+                format!(
+                    " {} replies | [r] Reply  [jk/↑↓] Scroll  [v] Vote  [Esc] Back",
+                    state.replies.len()
+                )
+            }
+        }
+        InputMode::ComposeReply => {
+            if state.reply_name_phase {
+                format!(
+                    " Name (optional, max 20): {}_ | [Enter] Next  [Esc] Cancel",
+                    state.reply_name_buf
+                )
+            } else {
+                format!(
+                    " Reply ({}/{}) | [Enter] Submit  [Esc] Cancel",
+                    state.compose_buf.len(),
+                    crate::reply::MAX_LENGTH,
+                )
+            }
+        }
     };
     let status =
         Paragraph::new(status_text).style(Style::default().bg(Color::DarkGray).fg(Color::White));
     frame.render_widget(status, status_area);
 
     if state.mode == InputMode::Compose {
-        render_compose(frame, state.compose_buf, area);
-    }
-}
-
-fn render_confession_box(
-    frame: &mut Frame,
-    c: &Confession,
-    area: Rect,
-    selected: bool,
-    has_voted: bool,
-) {
-    let border_style = if selected {
-        Style::default()
-            .fg(Color::Yellow)
-            .add_modifier(Modifier::BOLD)
-    } else if c.votes > 50 {
-        Style::default()
-            .fg(Color::Magenta)
-            .add_modifier(Modifier::BOLD)
-    } else if c.votes > 10 {
-        Style::default().fg(Color::Cyan)
-    } else {
-        Style::default().fg(Color::DarkGray)
-    };
-
-    let heart = if has_voted { "󰋑" } else { "♥" };
-    let vote_display = format!("{} {}", heart, c.votes);
-
-    let mut block = Block::bordered().border_style(border_style).title_bottom(
-        Line::from(Span::styled(vote_display, Style::default().fg(Color::Red))).right_aligned(),
-    );
-
-    if selected {
-        block = block.title(Line::from(Span::styled(
-            " ▶ ",
-            Style::default().fg(Color::Yellow),
-        )));
+        compose::render_confession(frame, state.compose_buf, area);
     }
 
-    let text_style = if c.votes > 50 {
-        Style::default()
-            .fg(Color::White)
-            .add_modifier(Modifier::BOLD)
-    } else if c.votes > 10 {
-        Style::default().fg(Color::White)
-    } else {
-        Style::default().fg(Color::Gray)
-    };
-
-    let paragraph = Paragraph::new(c.text.as_str())
-        .block(block)
-        .style(text_style)
-        .wrap(Wrap { trim: true });
-
-    frame.render_widget(paragraph, area);
-}
-
-fn render_compose(frame: &mut Frame, buf: &str, area: Rect) {
-    let popup_w = 50u16.min(area.width.saturating_sub(4));
-    let popup_h = 8u16.min(area.height.saturating_sub(4));
-    let popup_x = (area.width.saturating_sub(popup_w)) / 2;
-    let popup_y = (area.height.saturating_sub(popup_h)) / 2;
-
-    let popup_area = Rect::new(popup_x, popup_y, popup_w, popup_h);
-
-    frame.render_widget(Clear, popup_area);
-
-    let block = Block::bordered()
-        .border_style(Style::default().fg(Color::Yellow))
-        .title(" New Confession ");
-
-    let inner = block.inner(popup_area);
-
-    frame.render_widget(block, popup_area);
-
-    let display_text = if buf.is_empty() {
-        "Type your confession...".to_string()
-    } else {
-        format!("{}_", buf)
-    };
-
-    let text_style = if buf.is_empty() {
-        Style::default().fg(Color::DarkGray)
-    } else {
-        Style::default().fg(Color::White)
-    };
-
-    let paragraph = Paragraph::new(display_text)
-        .style(text_style)
-        .wrap(Wrap { trim: true });
-
-    frame.render_widget(paragraph, inner);
+    if state.mode == InputMode::ComposeReply && !state.reply_name_phase {
+        compose::render_reply(frame, state.compose_buf, state.reply_name_buf, area);
+    }
 }
