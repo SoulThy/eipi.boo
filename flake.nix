@@ -20,8 +20,7 @@
         default = pkgs.mkShell {
 
           packages = with pkgs; [
-            # uv
-            # python314
+          flyctl
           ];
 
           shellHook = ''
