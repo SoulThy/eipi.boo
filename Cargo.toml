@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-russh = "0.48"
+russh = "0.61"
 russh-keys = "0.48"
 ratatui = "0.29"
 crossterm = "0.28"
