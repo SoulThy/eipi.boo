@@ -266,7 +266,9 @@ impl ClientHandler {
             }
 
             match (&self.mode, &event) {
-                (InputMode::Browse, KeyEvent::Char('q')) => return true,
+                (InputMode::Browse, KeyEvent::Char('q')) => {
+                    self.mode = InputMode::ConfirmQuit;
+                }
                 (InputMode::Browse, KeyEvent::Up | KeyEvent::Char('k')) => self.cam_y -= 3,
                 (InputMode::Browse, KeyEvent::Down | KeyEvent::Char('j')) => self.cam_y += 3,
                 (InputMode::Browse, KeyEvent::Left | KeyEvent::Char('h')) => self.cam_x -= 5,
@@ -286,6 +288,13 @@ impl ClientHandler {
                         "bugs/features → https://github.com/pwnwriter/eipi.boo/issues/new"
                             .to_string(),
                     );
+                }
+
+                (InputMode::ConfirmQuit, KeyEvent::Char('q') | KeyEvent::Enter) => {
+                    return true;
+                }
+                (InputMode::ConfirmQuit, _) => {
+                    self.mode = InputMode::Browse;
                 }
 
                 (InputMode::ViewReplies, KeyEvent::Escape | KeyEvent::Char('q')) => {

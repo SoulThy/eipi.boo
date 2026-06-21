@@ -4,6 +4,7 @@ pub enum InputMode {
     Compose,
     ViewReplies,
     ComposeReply,
+    ConfirmQuit,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
