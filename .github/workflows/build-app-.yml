@@ -1,0 +1,38 @@
+name: Build the app
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - '*.nix'
+      - 'flake.*'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'src/**'
+      - '*.nix'
+      - 'flake.*'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Install Nix package manager
+      uses: DeterminateSystems/nix-installer-action@main
+
+    - name: Setup Nix cache
+      uses: DeterminateSystems/magic-nix-cache-action@main
+
+    - name: Build
+      run: nix develop -c 'cargo  build --release'
