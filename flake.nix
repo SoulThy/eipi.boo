@@ -24,6 +24,7 @@
           ];
 
           EIPI_LISTEN = "0.0.0.0:2222";
+          EIPI_NO_LIMIT = "1";
 
           shellHook = ''
             echo "------eipi.boo--------"
