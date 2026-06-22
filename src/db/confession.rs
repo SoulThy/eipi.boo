@@ -65,7 +65,7 @@ pub fn posts_today(conn: &Connection, fingerprint: &str) -> i64 {
     .unwrap_or(0)
 }
 
-pub const DAILY_POST_LIMIT: i64 = 3;
+pub use crate::consts::DAILY_POST_LIMIT;
 
 pub fn stats(conn: &Connection) -> (i64, i64) {
     let confessions: i64 = conn

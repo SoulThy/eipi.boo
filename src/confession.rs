@@ -29,9 +29,9 @@ pub fn time_ago(created_at: &str) -> String {
     }
 }
 
-pub const MAX_LENGTH: usize = 280;
-pub const BOX_WIDTH: u16 = 42;
-pub const BOX_INNER_WIDTH: usize = (BOX_WIDTH - 4) as usize; // borders + padding
+pub use crate::consts::MAX_CONFESSION_LENGTH as MAX_LENGTH;
+pub use crate::consts::BOX_WIDTH;
+pub use crate::consts::BOX_INNER_WIDTH;
 
 fn normalize(text: &str) -> String {
     text.to_lowercase()

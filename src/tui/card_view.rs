@@ -5,11 +5,9 @@ use ratatui::widgets::Paragraph;
 use ratatui::Frame;
 
 use crate::confession;
+use crate::consts;
 
 use super::RenderState;
-
-const CARD_MAX_W: u16 = 48;
-const CARD_MIN_W: u16 = 24;
 
 pub fn render(frame: &mut Frame, state: &RenderState, area: Rect) {
     if state.confessions.is_empty() {
@@ -26,9 +24,9 @@ pub fn render(frame: &mut Frame, state: &RenderState, area: Rect) {
     let has_voted = state.voted_ids.contains(&c.id);
 
     // responsive card width: use 60% of area, clamped to min/max
-    let desired = (area.width * 3 / 5).clamp(CARD_MIN_W, CARD_MAX_W);
+    let desired = (area.width * 3 / 5).clamp(consts::CARD_MIN_W, consts::CARD_MAX_W);
     let card_w = desired.min(area.width.saturating_sub(2)) as usize;
-    if card_w < CARD_MIN_W as usize {
+    if card_w < consts::CARD_MIN_W as usize {
         return;
     }
     let iw = card_w - 2; // inner width between │ borders

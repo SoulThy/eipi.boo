@@ -280,10 +280,10 @@ impl ClientHandler {
                 (InputMode::Browse, KeyEvent::Char('q')) => {
                     self.mode = InputMode::ConfirmQuit;
                 }
-                (InputMode::Browse, KeyEvent::Up | KeyEvent::Char('k')) => self.cam_y -= 3,
-                (InputMode::Browse, KeyEvent::Down | KeyEvent::Char('j')) => self.cam_y += 3,
-                (InputMode::Browse, KeyEvent::Left | KeyEvent::Char('h')) => self.cam_x -= 5,
-                (InputMode::Browse, KeyEvent::Right | KeyEvent::Char('l')) => self.cam_x += 5,
+                (InputMode::Browse, KeyEvent::Up | KeyEvent::Char('k')) => self.cam_y -= crate::consts::CAM_SPEED_Y,
+                (InputMode::Browse, KeyEvent::Down | KeyEvent::Char('j')) => self.cam_y += crate::consts::CAM_SPEED_Y,
+                (InputMode::Browse, KeyEvent::Left | KeyEvent::Char('h')) => self.cam_x -= crate::consts::CAM_SPEED_X,
+                (InputMode::Browse, KeyEvent::Right | KeyEvent::Char('l')) => self.cam_x += crate::consts::CAM_SPEED_X,
                 (InputMode::Browse, KeyEvent::Tab) => self.cycle_selection(),
                 (InputMode::Browse, KeyEvent::Enter) => {
                     self.came_from_card = false;
@@ -393,7 +393,7 @@ impl ClientHandler {
                 }
                 (InputMode::ComposeReply, KeyEvent::Char(c)) => {
                     if self.reply_name_phase {
-                        if self.reply_name_buf.len() < 20 {
+                        if self.reply_name_buf.len() < crate::consts::MAX_REPLY_NAME_LENGTH {
                             self.reply_name_buf.push(*c);
                         }
                     } else if self.compose_buf.len() < reply::MAX_LENGTH {
