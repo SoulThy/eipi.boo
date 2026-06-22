@@ -4,7 +4,7 @@ use std::sync::atomic::Ordering;
 use anyhow::Result;
 use crossterm::cursor;
 use crossterm::event::{DisableMouseCapture, EnableMouseCapture};
-use crossterm::terminal::{EnterAlternateScreen, LeaveAlternateScreen};
+use crossterm::terminal::{self, EnterAlternateScreen, LeaveAlternateScreen};
 use log::{debug, info, warn};
 use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
@@ -326,6 +326,20 @@ impl ClientHandler {
                     } else {
                         self.card_index - 1
                     };
+                    self.selected = Some(self.card_index);
+                }
+                (InputMode::CardView, KeyEvent::MouseClick(sx, _))
+                    if !self.confessions.is_empty() =>
+                {
+                    if *sx < self.width / 2 {
+                        self.card_index = if self.card_index == 0 {
+                            self.confessions.len() - 1
+                        } else {
+                            self.card_index - 1
+                        };
+                    } else {
+                        self.card_index = (self.card_index + 1) % self.confessions.len();
+                    }
                     self.selected = Some(self.card_index);
                 }
                 (InputMode::CardView, KeyEvent::Char('v')) => {
@@ -674,6 +688,12 @@ impl server::Handler for ClientHandler {
         debug!("Window change: {}x{}", col_width, row_height);
         self.width = col_width as u16;
         self.height = row_height as u16;
+
+        crossterm::execute!(self.writer, terminal::Clear(terminal::ClearType::All)).ok();
+        let clear_bytes = self.writer.drain();
+        if !clear_bytes.is_empty() {
+            let _ = session.data(channel_id, clear_bytes);
+        }
 
         self.terminal =
             crate::tui::create_terminal(self.writer.clone(), self.width, self.height).ok();
