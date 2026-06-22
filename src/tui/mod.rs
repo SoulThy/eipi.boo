@@ -71,6 +71,7 @@ pub struct RenderState<'a> {
     pub message: Option<&'a str>,
     pub total_confessions: i64,
     pub total_humans: i64,
+    pub online: usize,
     pub voted_ids: &'a [i64],
     pub replies: &'a [Reply],
     pub viewing_confession: Option<&'a Confession>,

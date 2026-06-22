@@ -41,6 +41,11 @@ pub fn render(frame: &mut Frame, state: &RenderState, area: Rect) {
             ),
             Span::styled(" · ", Style::default().fg(Color::Indexed(238))),
             Span::styled(
+                format!("{} online", state.online),
+                Style::default().fg(Color::Green),
+            ),
+            Span::styled(" · ", Style::default().fg(Color::Indexed(238))),
+            Span::styled(
                 "pwnwriter/eipi.boo",
                 Style::default().fg(Color::Indexed(242)),
             ),

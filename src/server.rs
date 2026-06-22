@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::sync::atomic::AtomicUsize;
 use std::sync::{Arc, Mutex};
 
 use anyhow::Result;
@@ -10,6 +11,7 @@ use crate::handler::ClientHandler;
 
 pub(crate) struct AppState {
     pub(crate) db: Mutex<rusqlite::Connection>,
+    pub(crate) online: AtomicUsize,
 }
 
 struct SshServer {
@@ -56,6 +58,7 @@ pub async fn run() -> Result<()> {
     let conn = db::init(&db_path)?;
     let state = Arc::new(AppState {
         db: Mutex::new(conn),
+        online: AtomicUsize::new(0),
     });
 
     let host_key = load_or_generate_host_key(&host_key_path)?;

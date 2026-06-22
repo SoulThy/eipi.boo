@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 
 use anyhow::Result;
 use crossterm::cursor;
@@ -236,13 +237,15 @@ impl ClientHandler {
         let fp = self.fingerprint_str().to_owned();
         let db = self.shared.db.lock().unwrap();
 
-        let today = db::posts_today(&db, &fp);
-        if today >= crate::consts::DAILY_POST_LIMIT {
-            self.message = Some(format!(
-                "Rate limit: {} confessions per day",
-                crate::consts::DAILY_POST_LIMIT
-            ));
-            return;
+        if std::env::var("EIPI_NO_LIMIT").is_err() {
+            let today = db::posts_today(&db, &fp);
+            if today >= crate::consts::DAILY_POST_LIMIT {
+                self.message = Some(format!(
+                    "Rate limit: {} confessions per day",
+                    crate::consts::DAILY_POST_LIMIT
+                ));
+                return;
+            }
         }
 
         drop(db);
@@ -464,6 +467,7 @@ impl ClientHandler {
             message: self.message.as_deref(),
             total_confessions,
             total_humans,
+            online: self.shared.online.load(Ordering::Relaxed),
             voted_ids: &voted_ids,
             replies: &self.replies,
             viewing_confession: viewing,
@@ -593,6 +597,7 @@ impl server::Handler for ClientHandler {
         info!("Shell request on channel {:?}", channel_id);
         self.shell_channel = Some(channel_id);
 
+        self.shared.online.fetch_add(1, Ordering::Relaxed);
         self.reload_confessions();
 
         let (cx, cy) = canvas::best_camera(&self.confessions, self.width, self.height);
@@ -679,5 +684,13 @@ impl server::Handler for ClientHandler {
         }
 
         Ok(())
+    }
+}
+
+impl Drop for ClientHandler {
+    fn drop(&mut self) {
+        if self.shell_channel.is_some() {
+            self.shared.online.fetch_sub(1, Ordering::Relaxed);
+        }
     }
 }
