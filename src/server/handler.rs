@@ -41,6 +41,7 @@ pub(crate) struct ClientHandler {
     card_index: usize,
     came_from_card: bool,
     message: Option<String>,
+    last_known_count: usize,
     terminal: Option<Terminal<CrosstermBackend<TermWriter>>>,
     writer: TermWriter,
 }
@@ -67,6 +68,7 @@ impl ClientHandler {
             card_index: 0,
             came_from_card: false,
             message: None,
+            last_known_count: 0,
             terminal: None,
             writer: TermWriter::default(),
         }
@@ -85,8 +87,21 @@ impl ClientHandler {
     }
 
     fn reload_confessions(&mut self) {
+        let old_count = self.confessions.len();
         let db = self.shared.db.lock();
         self.confessions = db::get_all(&db);
+        drop(db);
+
+        let new_count = self.confessions.len();
+        if self.last_known_count > 0 && new_count > old_count {
+            let diff = new_count - old_count;
+            self.message = Some(format!(
+                "{} new confession{}!",
+                diff,
+                if diff == 1 { "" } else { "s" }
+            ));
+        }
+        self.last_known_count = new_count;
     }
 
     fn visible_indices(&self) -> Vec<usize> {
@@ -260,13 +275,15 @@ impl ClientHandler {
                 self.message = Some("Confession posted!".to_string());
                 self.cam_x = x - self.width as i64 / 2;
                 self.cam_y = y - self.height as i64 / 2;
+                drop(db);
+                self.shared.notify.send(()).ok();
             }
             Err(e) => {
+                drop(db);
                 self.message = Some(format!("Error: {}", e));
             }
         }
 
-        drop(db);
         self.compose_buf.clear();
         self.reload_confessions();
     }
@@ -636,6 +653,18 @@ impl server::Handler for ClientHandler {
             debug!("Initial render: {} bytes", output.len());
             let _ = session.data(channel_id, output);
         }
+
+        // background task: notify this client when someone else posts
+        let handle = session.handle();
+        let mut rx = self.shared.notify.subscribe();
+        tokio::spawn(async move {
+            while rx.recv().await.is_ok() {
+                // bell character makes the terminal flash/beep
+                if handle.data(channel_id, "\x07".as_bytes()).await.is_err() {
+                    break;
+                }
+            }
+        });
 
         Ok(())
     }

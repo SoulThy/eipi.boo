@@ -6,6 +6,7 @@ use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 
 use parking_lot::Mutex;
+use tokio::sync::broadcast;
 
 use anyhow::Result;
 use log::info;
@@ -17,6 +18,7 @@ use handler::ClientHandler;
 pub(crate) struct AppState {
     pub(crate) db: Mutex<rusqlite::Connection>,
     pub(crate) online: AtomicUsize,
+    pub(crate) notify: broadcast::Sender<()>,
 }
 
 struct SshServer {
@@ -61,9 +63,11 @@ pub async fn run() -> Result<()> {
     let listen_addr = std::env::var("EIPI_LISTEN").unwrap_or_else(|_| "0.0.0.0:22".to_string());
 
     let conn = db::init(&db_path)?;
+    let (notify_tx, _) = broadcast::channel(16);
     let state = Arc::new(AppState {
         db: Mutex::new(conn),
         online: AtomicUsize::new(0),
+        notify: notify_tx,
     });
 
     let host_key = load_or_generate_host_key(&host_key_path)?;
