@@ -5,8 +5,9 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Clear, Paragraph, Wrap};
 
 fn centered_popup(frame: &mut Frame, area: Rect, w: u16, h: u16) -> Rect {
-    let pw = w.min(area.width.saturating_sub(4));
-    let ph = h.min(area.height.saturating_sub(4));
+    let max_w = (area.width * 9 / 10).max(20);
+    let pw = w.min(max_w).min(area.width.saturating_sub(2));
+    let ph = h.min(area.height.saturating_sub(2));
     let popup = Rect::new(
         (area.width.saturating_sub(pw)) / 2,
         (area.height.saturating_sub(ph)) / 2,

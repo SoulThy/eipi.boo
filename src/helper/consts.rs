@@ -10,7 +10,7 @@ pub const BOX_INNER_WIDTH: usize = (BOX_WIDTH - 4) as usize;
 
 // card view
 pub const CARD_MAX_W: u16 = 48;
-pub const CARD_MIN_W: u16 = 24;
+pub const CARD_MIN_W: u16 = 18;
 
 // vote thresholds
 pub const VOTES_GLOW: i64 = 2;

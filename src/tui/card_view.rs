@@ -23,8 +23,9 @@ pub fn render(frame: &mut Frame, state: &RenderState, area: Rect) {
     let c = &state.confessions[idx];
     let has_voted = state.voted_ids.contains(&c.id);
 
-    // responsive card width: use 60% of area, clamped to min/max
-    let desired = (area.width * 3 / 5).clamp(consts::CARD_MIN_W, consts::CARD_MAX_W);
+    // responsive card width: use more screen on small terminals
+    let pct = if area.width < 50 { 90 } else { 60 };
+    let desired = (area.width * pct / 100).clamp(consts::CARD_MIN_W, consts::CARD_MAX_W);
     let card_w = desired.min(area.width.saturating_sub(2)) as usize;
     if card_w < consts::CARD_MIN_W as usize {
         return;
