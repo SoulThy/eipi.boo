@@ -10,6 +10,7 @@ use ratatui::Terminal;
 use ratatui::backend::CrosstermBackend;
 use russh::server::{self, Auth, Msg, Session};
 use russh::{Channel, ChannelId};
+use sha2::{Digest, Sha256};
 
 use crate::canvas;
 use crate::confession::{self, Confession};
@@ -83,7 +84,7 @@ impl ClientHandler {
     }
 
     fn reload_confessions(&mut self) {
-        let db = self.shared.db.lock().unwrap();
+        let db = self.shared.db.lock();
         self.confessions = db::get_all(&db);
     }
 
@@ -138,7 +139,7 @@ impl ClientHandler {
         let confession_id = confession.id;
         let fp = self.fingerprint_str();
 
-        let db = self.shared.db.lock().unwrap();
+        let db = self.shared.db.lock();
         match db::upvote(&db, confession_id, fp) {
             Ok(new_votes) => {
                 self.message = Some(format!("Upvoted! (♥ {})", new_votes));
@@ -156,7 +157,7 @@ impl ClientHandler {
         let Some(confession) = self.confessions.get(idx) else {
             return;
         };
-        let db = self.shared.db.lock().unwrap();
+        let db = self.shared.db.lock();
         self.replies = db::get_replies(&db, confession.id);
         self.viewing_confession = Some(idx);
         self.reply_scroll = 0;
@@ -167,7 +168,7 @@ impl ClientHandler {
         if let Some(idx) = self.viewing_confession
             && let Some(confession) = self.confessions.get(idx)
         {
-            let db = self.shared.db.lock().unwrap();
+            let db = self.shared.db.lock();
             self.replies = db::get_replies(&db, confession.id);
         }
     }
@@ -201,7 +202,7 @@ impl ClientHandler {
             Some(self.reply_name_buf.trim().to_string())
         };
 
-        let db = self.shared.db.lock().unwrap();
+        let db = self.shared.db.lock();
         match db::insert_reply(&db, confession.id, &text, name.as_deref(), fp) {
             Ok(_) => {
                 self.message = Some("Reply posted!".to_string());
@@ -235,7 +236,7 @@ impl ClientHandler {
         }
 
         let fp = self.fingerprint_str().to_owned();
-        let db = self.shared.db.lock().unwrap();
+        let db = self.shared.db.lock();
 
         if std::env::var("EIPI_NO_LIMIT").is_err() {
             let today = db::posts_today(&db, &fp);
@@ -251,7 +252,7 @@ impl ClientHandler {
         drop(db);
         self.reload_confessions();
         let (x, y) = canvas::random_position(&self.confessions, &text);
-        let db = self.shared.db.lock().unwrap();
+        let db = self.shared.db.lock();
 
         match db::insert(&db, &text, x, y, &fp) {
             Ok(_) => {
@@ -459,7 +460,7 @@ impl ClientHandler {
             return Vec::new();
         };
         let (total_confessions, total_humans, voted_ids) = {
-            let db = self.shared.db.lock().unwrap();
+            let db = self.shared.db.lock();
             let stats = db::stats(&db);
             let voted = db::voted_confession_ids(&db, &fp);
             (stats.0, stats.1, voted)
@@ -549,9 +550,11 @@ impl server::Handler for ClientHandler {
         _user: &str,
         key: &russh::keys::PublicKey,
     ) -> Result<Auth, Self::Error> {
-        let fp = key.fingerprint(russh::keys::HashAlg::Sha256);
-        self.fingerprint = Some(fp.to_string());
-        info!("Auth accepted for fingerprint: {}", self.fingerprint_str());
+        let raw_fp = key.fingerprint(russh::keys::HashAlg::Sha256);
+        let hash = Sha256::digest(raw_fp.as_bytes());
+        let hashed_fp = format!("{:x}", hash);
+        self.fingerprint = Some(hashed_fp);
+        info!("Auth accepted (fingerprint hashed)");
         Ok(Auth::Accept)
     }
 

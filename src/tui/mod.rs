@@ -6,7 +6,9 @@ mod reply_panel;
 mod statusline;
 
 use std::io::Write;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+
+use parking_lot::Mutex;
 
 use ratatui::backend::CrosstermBackend;
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -26,7 +28,7 @@ pub struct TermWriter {
 
 impl TermWriter {
     pub fn drain(&self) -> Vec<u8> {
-        let mut buf = self.buf.lock().unwrap();
+        let mut buf = self.buf.lock();
         let data = buf.clone();
         buf.clear();
         data
@@ -35,7 +37,7 @@ impl TermWriter {
 
 impl Write for TermWriter {
     fn write(&mut self, data: &[u8]) -> std::io::Result<usize> {
-        self.buf.lock().unwrap().extend_from_slice(data);
+        self.buf.lock().extend_from_slice(data);
         Ok(data.len())
     }
 
