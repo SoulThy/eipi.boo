@@ -29,7 +29,7 @@ pub fn render(frame: &mut Frame, state: &RenderState, area: Rect) {
     let hints_area = Rect::new(area.x, area.y + 2, area.width, 1);
 
     let info_line = match state.mode {
-        InputMode::Browse | InputMode::CardView => Line::from(vec![
+        InputMode::Browse | InputMode::CardView | InputMode::SearchResults => Line::from(vec![
             Span::styled(
                 format!("{} confessions", state.total_confessions),
                 Style::default().fg(Color::Indexed(242)),
@@ -81,6 +81,7 @@ pub fn render(frame: &mut Frame, state: &RenderState, area: Rect) {
             spans.extend(hint("v", "vote"));
             spans.extend(hint("⏎", "replies"));
             spans.extend(hint("␣", "feed"));
+            spans.extend(hint("/", "search"));
             spans.extend(hint("n", "confess"));
             spans.extend(hint("q", "quit"));
         }
@@ -88,6 +89,7 @@ pub fn render(frame: &mut Frame, state: &RenderState, area: Rect) {
             spans.extend(hint("←→/hl", "prev/next"));
             spans.extend(hint("v", "vote"));
             spans.extend(hint("⏎", "replies"));
+            spans.extend(hint("/", "search"));
             spans.extend(hint("n", "confess"));
             spans.extend(hint("␣", "canvas"));
         }
@@ -134,6 +136,25 @@ pub fn render(frame: &mut Frame, state: &RenderState, area: Rect) {
                 spans.extend(hint("⏎", "submit"));
                 spans.extend(hint("esc", "cancel"));
             }
+        }
+        InputMode::Search => {
+            spans.extend(hint("⏎", "search"));
+            spans.extend(hint("esc", "cancel"));
+        }
+        InputMode::SearchResults => {
+            spans.push(Span::styled(
+                format!(
+                    "{}/{} matches",
+                    state.search_index + 1,
+                    state.search_result_count
+                ),
+                Style::default().fg(Color::Magenta),
+            ));
+            spans.push(Span::raw("   "));
+            spans.extend(hint("←→/hl", "prev/next"));
+            spans.extend(hint("v", "vote"));
+            spans.extend(hint("⏎", "replies"));
+            spans.extend(hint("esc", "back"));
         }
         InputMode::ConfirmQuit => {}
     }

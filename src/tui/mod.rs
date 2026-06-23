@@ -80,6 +80,9 @@ pub struct RenderState<'a> {
     pub reply_scroll: usize,
     pub card_index: usize,
     pub came_from_card: bool,
+    pub search_buf: &'a str,
+    pub search_result_count: usize,
+    pub search_index: usize,
 }
 
 pub fn render(frame: &mut Frame, state: &RenderState) {
@@ -97,7 +100,7 @@ pub fn render(frame: &mut Frame, state: &RenderState) {
     let card_reply = state.came_from_card
         && matches!(state.mode, InputMode::ViewReplies | InputMode::ComposeReply);
 
-    if state.mode == InputMode::CardView {
+    if state.mode == InputMode::CardView || state.mode == InputMode::SearchResults {
         card_view::render(frame, state, main_area);
         statusline::render(frame, state, status_area);
         return;
@@ -196,6 +199,10 @@ pub fn render(frame: &mut Frame, state: &RenderState) {
 
     if state.mode == InputMode::ComposeReply && !state.reply_name_phase {
         compose::render_reply(frame, state.compose_buf, state.reply_name_buf, area);
+    }
+
+    if state.mode == InputMode::Search {
+        compose::render_search(frame, state.search_buf, area);
     }
 
     if state.mode == InputMode::ConfirmQuit {

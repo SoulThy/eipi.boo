@@ -5,6 +5,8 @@ pub enum InputMode {
     Compose,
     ViewReplies,
     ComposeReply,
+    Search,
+    SearchResults,
     ConfirmQuit,
 }
 

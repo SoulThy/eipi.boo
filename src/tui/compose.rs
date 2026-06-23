@@ -57,6 +57,16 @@ pub fn render_reply(frame: &mut Frame, buf: &str, name: &str, area: Rect) {
     text_input(frame, buf, "Type your reply...", inner);
 }
 
+pub fn render_search(frame: &mut Frame, buf: &str, area: Rect) {
+    let popup = centered_popup(frame, area, 50, 5);
+    let block = Block::bordered()
+        .border_style(Style::default().fg(Color::Magenta))
+        .title(" Search ");
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+    text_input(frame, buf, "Type to search confessions...", inner);
+}
+
 pub fn render_quit(frame: &mut Frame, area: Rect) {
     let popup = centered_popup(frame, area, 40, 7);
     let block = Block::bordered().border_style(Style::default().fg(Color::Red));

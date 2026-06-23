@@ -42,6 +42,9 @@ pub(crate) struct ClientHandler {
     came_from_card: bool,
     message: Option<String>,
     last_known_count: usize,
+    search_buf: String,
+    search_results: Vec<usize>,
+    search_index: usize,
     terminal: Option<Terminal<CrosstermBackend<TermWriter>>>,
     writer: TermWriter,
 }
@@ -69,6 +72,9 @@ impl ClientHandler {
             came_from_card: false,
             message: None,
             last_known_count: 0,
+            search_buf: String::new(),
+            search_results: Vec::new(),
+            search_index: 0,
             terminal: None,
             writer: TermWriter::default(),
         }
@@ -383,6 +389,11 @@ impl ClientHandler {
                     self.mode = InputMode::Browse;
                 }
 
+                (InputMode::Browse | InputMode::CardView, KeyEvent::Char('/')) => {
+                    self.mode = InputMode::Search;
+                    self.search_buf.clear();
+                }
+
                 (InputMode::Browse, KeyEvent::Char('?')) => {
                     self.message = Some(
                         "bugs/features → https://github.com/pwnwriter/eipi.boo/issues/new"
@@ -449,6 +460,73 @@ impl ClientHandler {
                     }
                 }
 
+                (InputMode::Search, KeyEvent::Escape) => {
+                    self.mode = self.return_mode();
+                    self.search_buf.clear();
+                }
+                (InputMode::Search, KeyEvent::Enter) => {
+                    let query = self.search_buf.to_lowercase();
+                    if query.is_empty() {
+                        self.mode = self.return_mode();
+                    } else {
+                        self.search_results = self
+                            .confessions
+                            .iter()
+                            .enumerate()
+                            .filter(|(_, c)| c.text.to_lowercase().contains(&query))
+                            .map(|(i, _)| i)
+                            .collect();
+                        if self.search_results.is_empty() {
+                            self.message = Some(format!("No results for \"{}\"", self.search_buf));
+                            self.mode = self.return_mode();
+                        } else {
+                            self.search_index = 0;
+                            self.card_index = self.search_results[0];
+                            self.selected = Some(self.card_index);
+                            self.mode = InputMode::SearchResults;
+                        }
+                    }
+                }
+                (InputMode::Search, KeyEvent::Char(c)) => {
+                    self.search_buf.push(*c);
+                }
+                (InputMode::Search, KeyEvent::Backspace) => {
+                    self.search_buf.pop();
+                }
+
+                (InputMode::SearchResults, KeyEvent::Right | KeyEvent::Char('l'))
+                    if !self.search_results.is_empty() =>
+                {
+                    self.search_index = (self.search_index + 1) % self.search_results.len();
+                    self.card_index = self.search_results[self.search_index];
+                    self.selected = Some(self.card_index);
+                }
+                (InputMode::SearchResults, KeyEvent::Left | KeyEvent::Char('h'))
+                    if !self.search_results.is_empty() =>
+                {
+                    self.search_index = if self.search_index == 0 {
+                        self.search_results.len() - 1
+                    } else {
+                        self.search_index - 1
+                    };
+                    self.card_index = self.search_results[self.search_index];
+                    self.selected = Some(self.card_index);
+                }
+                (InputMode::SearchResults, KeyEvent::Char('v')) => {
+                    self.selected = Some(self.card_index);
+                    self.upvote_selected();
+                }
+                (InputMode::SearchResults, KeyEvent::Enter) => {
+                    self.selected = Some(self.card_index);
+                    self.came_from_card = true;
+                    self.open_replies();
+                }
+                (InputMode::SearchResults, KeyEvent::Escape | KeyEvent::Char('q')) => {
+                    self.search_results.clear();
+                    self.search_buf.clear();
+                    self.mode = InputMode::Browse;
+                }
+
                 (InputMode::Compose, KeyEvent::Escape) => {
                     self.mode = self.return_mode();
                     self.compose_buf.clear();
@@ -508,6 +586,9 @@ impl ClientHandler {
             reply_scroll: self.reply_scroll,
             card_index: self.card_index,
             came_from_card: self.came_from_card,
+            search_buf: &self.search_buf,
+            search_result_count: self.search_results.len(),
+            search_index: self.search_index,
         };
 
         match terminal.draw(|frame| {
